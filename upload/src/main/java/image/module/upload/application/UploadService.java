@@ -8,6 +8,7 @@ import io.minio.PutObjectArgs;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.CompletableFuture;
 import javax.imageio.ImageIO;
@@ -49,23 +50,17 @@ public class UploadService {
                 ImageExtension extension = ImageExtension.findByKey(fileInfos[1])
                         .orElseThrow(() -> new Exception("지원하지 않는 확장자 입니다."));
 
-                // 이미지 크기 확인
-                BufferedImage bufferedImage = ImageIO.read(file.getInputStream());
-                int imageWidth = bufferedImage.getWidth();
-                int imageHeight = bufferedImage.getHeight();
-                int imageSize = Math.max(imageWidth, imageHeight);
+                // createImageRequest
+                ImageRequest imageRequest = createImageRequest(file, cachingTime, originalName, extension);
 
-                ImageRequest imageRequest = ImageRequest.create(
-                        originalName,
-                        extension.getKey(),
-                        imageSize,
-                        cachingTime
-                );
+                String storedFileName = imageRequest.getStoredFileName();
 
-                uploadImage(file.getInputStream(), file.getSize(), file.getContentType(), imageRequest.getStoredFileName(), requestSize);
+                uploadImageToMinio(file.getInputStream(), file.getSize(), file.getContentType(), storedFileName);
 
                 // 메타데이터 저장
-                ImageResponse imageResponse = dataService.uploadImage(imageRequest);
+                ImageResponse imageResponse = dataService.saveImageOriginalData(imageRequest);
+
+                kafkaTemplate.send("image-upload-topic", ImageUploadMessage.createMessage(storedFileName,requestSize));
 
                 return imageResponse.getOriginalFileUUID().toString();
             } catch (Exception e) {
@@ -75,9 +70,24 @@ public class UploadService {
         });
     }
 
+    private static ImageRequest createImageRequest(MultipartFile file, int cachingTime, String originalName,
+                                                ImageExtension extension) throws IOException {
+        BufferedImage bufferedImage = ImageIO.read(file.getInputStream());
+        int imageWidth = bufferedImage.getWidth();
+        int imageHeight = bufferedImage.getHeight();
+        int imageSize = Math.max(imageWidth, imageHeight);
+
+        return ImageRequest.create(
+                originalName,
+                extension.getKey(),
+                imageSize,
+                cachingTime
+        );
+    }
+
     //이미지 업로드
     @SneakyThrows
-    public void uploadImage(InputStream fileInputStream, long size, String contentType, String storedFileName, int requestSize) {
+    public void uploadImageToMinio(InputStream fileInputStream, long size, String contentType, String storedFileName) {
             minioClient.putObject(
                     PutObjectArgs.builder()
                             .bucket(bucketName)
@@ -86,7 +96,5 @@ public class UploadService {
                             .contentType(contentType)
                             .build()
             );
-
-            kafkaTemplate.send("image-upload-topic", ImageUploadMessage.createMessage(storedFileName,requestSize));
     }
 }

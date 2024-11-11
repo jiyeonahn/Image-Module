@@ -10,5 +10,5 @@ import org.springframework.web.bind.annotation.RequestBody;
 public interface DataClient extends DataService {
 
     @PostMapping("/image/upload")
-    ImageResponse uploadImage(@RequestBody ImageRequest imageRequest);
+    ImageResponse saveImageOriginalData(@RequestBody ImageRequest imageRequest);
 }
