@@ -20,6 +20,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Slf4j
 @Service
@@ -32,9 +33,37 @@ public class UploadService {
     @Value("${minio.bucket}")
     private String bucketName;
 
+    public void handleUpload(MultipartFile file, int size, int cachingTime, SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event().name("INIT").data("이미지 업로드가 시작되었습니다."));
+            uploadOriginalImage(file, size, cachingTime).handle((result, ex) -> {
+                try {
+                    if (ex == null) {
+                        emitter.send(SseEmitter.event().name("SUCCESS").data("이미지 업로드 완료: " + result));
+                        emitter.complete();
+                    } else {
+                        emitter.send(SseEmitter.event().name("ERROR").data(file.getOriginalFilename() + " 업로드 실패..." + ex.getMessage()));
+                        emitter.completeWithError(ex);
+                    }
+                } catch (IOException e) {
+                    log.error("IOException 발생", e);
+                    emitter.completeWithError(e);
+                }
+                return null;
+            });
+        } catch (IOException e) {
+            log.error("IOException 발생", e);
+            try {
+                emitter.send(SseEmitter.event().name("ERROR").data("업로드 실패..."));
+            } catch (IOException ioException) {
+                log.error("SseEmitter 전송 오류", ioException);
+            }
+            emitter.completeWithError(e);
+        }
+    }
+
     //이미지 데이터 db 저장
-    @Transactional
-    public CompletableFuture<String> saveImageMetadata(MultipartFile file, int requestSize, int cachingTime) {
+    public CompletableFuture<String> uploadOriginalImage(MultipartFile file, int requestSize, int cachingTime) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 // 업로드 파일명을 불러옴
