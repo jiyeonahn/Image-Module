@@ -43,7 +43,7 @@ minio:
     key: minio
     secret: minioadmin
   buckets:
-    downloadBucket: mybucket
+    downloadBucket: original-bucket
     uploadBucket: update-bucket
 
 cdn-server:

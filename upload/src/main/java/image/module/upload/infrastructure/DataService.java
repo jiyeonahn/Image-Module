@@ -4,5 +4,5 @@ import image.module.upload.application.ImageRequest;
 import image.module.upload.application.ImageResponse;
 
 public interface DataService {
-    ImageResponse uploadImage(ImageRequest imageRequest);
+    ImageResponse saveImageOriginalData(ImageRequest imageRequest);
 }

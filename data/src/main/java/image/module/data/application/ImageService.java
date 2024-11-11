@@ -20,7 +20,7 @@ public class ImageService {
   private final ImageRepository imageRepository;
 
   @Transactional
-  public ImageResponse saveImage(ImageRequest request) {
+  public ImageResponse saveImageOriginalData(ImageRequest request) {
     Image image = Image.create(request);
     imageRepository.save(image);
     image.assignOriginalFileUUID();

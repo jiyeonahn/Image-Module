@@ -10,7 +10,7 @@ minio:
     key: minio
     secret: minioadmin
   buckets:
-    downloadBucket: mybucket
+    downloadBucket: original-bucket
     uploadBucket: update-bucket  # 수정된 부분
 
 eureka:
