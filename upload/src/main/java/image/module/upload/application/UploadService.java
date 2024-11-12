@@ -94,7 +94,8 @@ public class UploadService {
 
                 return imageResponse.getOriginalFileUUID().toString();
             } catch (Exception e) {
-                log.error("이미지 메타데이터 저장 중 오류 발생: ", e);
+                log.error("IMAGE UPLOAD FAIL!! ", e);
+                this.rollbackUpload("");
                 throw new RuntimeException(e);
             }
         });
@@ -131,5 +132,6 @@ public class UploadService {
     @KafkaListener(topics = "image-upload-error-topic", groupId = "image-upload-group")
     public void rollbackUpload(String storedOriginalFileName) {
         log.error("UPLOAD ROLLBACK! {}", storedOriginalFileName);
+        //storedOriginalFileName 파일 삭제하기
     }
 }

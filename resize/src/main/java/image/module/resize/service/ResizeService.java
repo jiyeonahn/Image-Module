@@ -68,7 +68,7 @@ public class ResizeService {
             // 7. 임시 파일 삭제
             cleanupTemporaryFiles(originalFile, resizeFile);
         } catch (Exception e) {
-            log.error("이미지 리사이즈 실패");
+            log.error("IMAGE RESIZE FAIL!!", e);
             kafkaTemplate.send("image-convert-error-topic", receiveKafkaMessage.getStoredOriginalFileName());
         }
 
@@ -80,11 +80,11 @@ public class ResizeService {
         int dotIndex = fileName.lastIndexOf(".");
 
         if (dotIndex != -1) {
-//            // 마지막 점(.) 앞부분까지만 잘라내기
-//            return fileName.substring(0, dotIndex);
-//        } else {
+            // 마지막 점(.) 앞부분까지만 잘라내기
+            return fileName.substring(0, dotIndex);
+        } else {
             throw new IllegalArgumentException("파일 이름에 확장자가 포함되어 있지 않습니다.");
-        }return null;
+        }
     }
 
     public File downloadImage(String webPFileName) {

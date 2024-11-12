@@ -53,38 +53,44 @@ public class ConvertService {
   // 전체 이미지 처리 로직을 관리하는 메서드
   @KafkaListener(topics = "image-convert-topic", groupId = "image-upload-group")
   public void removeMetadataAndCovertWebP(OriginalImageResponse originalImage) {
-    String storedOriginalFileName = originalImage.getStoredFileName();
-    Integer size = originalImage.getRequestSize();
+    try{
+      String storedOriginalFileName = originalImage.getStoredFileName();
+      Integer size = originalImage.getRequestSize();
 
-    // 1. 확장자 추출
-    String extension = extractExtensionFrom(storedOriginalFileName);
+      // 1. 확장자 추출
+      String extension = extractExtensionFrom(storedOriginalFileName);
 
-    // 2. 이미지 다운로드
-    File originalFile = downloadImage(storedOriginalFileName);
+      // 2. 이미지 다운로드
+      File originalFile = downloadImage(storedOriginalFileName);
 
-    // 3. MINIO 원본 이미지 삭제
-    removeOriginalImage(storedOriginalFileName);
+      // 3. MINIO 원본 이미지 삭제
+      removeOriginalImage(storedOriginalFileName);
 
-    // 4. EXIF 메타 데이터 삭제 및 이미지 회전 처리
-    File checkedRotate = removeMetadataAndFixOrientation(originalFile, extension);
+      // 4. EXIF 메타 데이터 삭제 및 이미지 회전 처리
+      File checkedRotate = removeMetadataAndFixOrientation(originalFile, extension);
 
-    // 5. 메타데이터 삭제 이미지 업로드
-    uploadRemoveExifImage(checkedRotate, storedOriginalFileName, extension);
+      // 5. 메타데이터 삭제 이미지 업로드
+      uploadRemoveExifImage(checkedRotate, storedOriginalFileName, extension);
 
-    // 6. 원본 이미지 cdnUrl 추가
-    OriginalFileInfo originalFileInfo = OriginalFileInfo.createCdnUrl(storedOriginalFileName, cdnBaseUrl);
-    dataClient.createCdnUrl(originalFileInfo);
+      // 6. 원본 이미지 cdnUrl 추가
+      OriginalFileInfo originalFileInfo = OriginalFileInfo.createCdnUrl(storedOriginalFileName, cdnBaseUrl);
+      dataClient.createCdnUrl(originalFileInfo);
 
-    // 7. WebP로 변환
-    File webpFile = convertToWebp(storedOriginalFileName, originalFile);
+      // 7. WebP로 변환
+      File webpFile = convertToWebp(storedOriginalFileName, originalFile);
 
-    // 8. WebP 이미지 업로드
-    uploadWebPImage(webpFile);
+      // 8. WebP 이미지 업로드
+      uploadWebPImage(webpFile);
 
-    kafkaTemplate.send("image-resize-topic", SendKafkaMessage.createMessage(storedOriginalFileName, webpFile.getName(), size));
+      kafkaTemplate.send("image-resize-topic", SendKafkaMessage.createMessage(storedOriginalFileName, webpFile.getName(), size));
 
-    // 9. 임시 파일 삭제
-    cleanupTemporaryFiles(originalFile, checkedRotate, webpFile);
+      // 9. 임시 파일 삭제
+      cleanupTemporaryFiles(originalFile, checkedRotate, webpFile);
+
+    } catch (Exception e) {
+      log.error("IMAGE CONVERT FAIL!!", e);
+      this.rollbackConvert(originalImage.getStoredFileName());
+    }
   }
 
 
