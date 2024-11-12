@@ -30,25 +30,28 @@ public class UploadService {
     private final MinioClient minioClient;
     private final DataService dataService;
     private final KafkaTemplate<String, ImageUploadMessage> kafkaTemplate;
+    private SseEmitter sseEmitter;
 
     @Value("${minio.bucket}")
     private String bucketName;
 
     public void handleUpload(MultipartFile file, int size, int cachingTime, SseEmitter emitter) {
         try {
-            emitter.send(SseEmitter.event().name("INIT").data("이미지 업로드가 시작되었습니다."));
-            uploadOriginalImage(file, size, cachingTime).handle((result, ex) -> {
+            sseEmitter = emitter;
+            sseEmitter.send(SseEmitter.event().name("INIT").data("이미지 업로드가 시작되었습니다."));
+            uploadOriginalImage(file, cachingTime).handle((result, ex) -> {
                 try {
                     if (ex == null) {
-                        emitter.send(SseEmitter.event().name("SUCCESS").data("이미지 업로드 완료: " + result));
-                        emitter.complete();
+                        sseEmitter.send(SseEmitter.event().name("1.ORIGINAL").data("이미지 원본 업로드가 완료되었습니다: " + result.getOriginalFileUUID()));
+                        kafkaTemplate.send("image-convert-topic", ImageUploadMessage.createMessage(
+                                result.getStoredFileName(), size));
                     } else {
-                        emitter.send(SseEmitter.event().name("ERROR").data(file.getOriginalFilename() + " 업로드 실패..." + ex.getMessage()));
-                        emitter.completeWithError(ex);
+                        sseEmitter.send(SseEmitter.event().name("ERROR").data(file.getOriginalFilename() + " 업로드 실패..." + ex.getMessage()));
+                        sseEmitter.completeWithError(ex);
                     }
                 } catch (IOException e) {
                     log.error("IOException 발생", e);
-                    emitter.completeWithError(e);
+                    sseEmitter.completeWithError(e);
                 }
                 return null;
             });
@@ -64,7 +67,8 @@ public class UploadService {
     }
 
     //이미지 데이터 db 저장
-    public CompletableFuture<String> uploadOriginalImage(MultipartFile file, int requestSize, int cachingTime) {
+    public CompletableFuture<ImageResponse> uploadOriginalImage(MultipartFile file, int cachingTime)
+            throws IOException {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 // 업로드 파일명을 불러옴
@@ -87,15 +91,10 @@ public class UploadService {
 
                 uploadImageToMinio(file.getInputStream(), file.getSize(), file.getContentType(), storedFileName);
 
-                // 메타데이터 저장
-                ImageResponse imageResponse = dataService.saveImageOriginalData(imageRequest);
-
-                kafkaTemplate.send("image-convert-topic", ImageUploadMessage.createMessage(storedFileName,requestSize));
-
-                return imageResponse.getOriginalFileUUID().toString();
+                return dataService.saveImageOriginalData(imageRequest);
             } catch (Exception e) {
                 log.error("IMAGE UPLOAD FAIL!! ", e);
-                this.rollbackUpload("");
+                //this.rollbackUpload("");
                 throw new RuntimeException(e);
             }
         });
@@ -129,9 +128,22 @@ public class UploadService {
             );
     }
 
-    @KafkaListener(topics = "image-upload-error-topic", groupId = "image-upload-group")
-    public void rollbackUpload(String storedOriginalFileName) {
-        log.error("UPLOAD ROLLBACK! {}", storedOriginalFileName);
-        //storedOriginalFileName 파일 삭제하기
+    @KafkaListener(topics = "convert-complete", groupId = "image-upload-group")
+    public void onConvertComplete(String message) throws IOException {
+        sseEmitter.send(SseEmitter.event().name("2.CONVERT").data(message));
     }
+
+    @KafkaListener(topics = "resize-complete", groupId = "image-upload-group")
+    public void onResizeComplete(String message) throws IOException {
+        sseEmitter.send(SseEmitter.event().name("3.RESIZE").data(message));
+        sseEmitter.complete();
+    }
+
+//    @KafkaListener(topics = "image-upload-error-topic", groupId = "image-upload-group")
+//    public void rollbackUpload(String storedOriginalFileName) {
+//        log.error("UPLOAD ROLLBACK! {}", storedOriginalFileName);
+//
+//        sseEmitter.send(SseEmitter.event().name("ERROR").data(file.getOriginalFilename() + " 이미지 변환 실패..." + ex.getMessage()));
+//        sseEmitter.completeWithError(ex);
+//    }
 }

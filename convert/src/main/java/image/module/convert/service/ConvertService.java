@@ -87,6 +87,7 @@ public class ConvertService {
       // 9. 임시 파일 삭제
       cleanupTemporaryFiles(originalFile, checkedRotate, webpFile);
 
+      convertComplete();
     } catch (Exception e) {
       log.error("IMAGE CONVERT FAIL!!", e);
       this.rollbackConvert(originalImage.getStoredFileName());
@@ -260,6 +261,10 @@ public class ConvertService {
         }
       }
     }
+  }
+
+  public void convertComplete(){
+    kafkaTemplate.send("convert-complete", "이미지 변환이 완료되었습니다.");
   }
 
   @KafkaListener(topics = "image-convert-error-topic", groupId = "image-upload-group", containerFactory = "stringKafkaListenerContainerFactory")

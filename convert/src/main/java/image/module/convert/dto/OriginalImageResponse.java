@@ -1,6 +1,7 @@
 package image.module.convert.dto;
 
 import lombok.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Getter
 @Setter

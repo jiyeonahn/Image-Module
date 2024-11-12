@@ -67,6 +67,7 @@ public class ResizeService {
 
             // 7. 임시 파일 삭제
             cleanupTemporaryFiles(originalFile, resizeFile);
+            resizeComplete();
         } catch (Exception e) {
             log.error("IMAGE RESIZE FAIL!!", e);
             kafkaTemplate.send("image-convert-error-topic", receiveKafkaMessage.getStoredOriginalFileName());
@@ -151,7 +152,7 @@ public class ResizeService {
             return resizedImage.output(WebpWriter.DEFAULT, resizedFile);
 
         } catch (IOException e) {
-            log.error("이미지 리사이징 실패: " + e.getMessage(), e);
+            log.error("이미지 리사이징 실패: {}", e.getMessage(), e);
             throw new IllegalArgumentException("이미지 리사이징 실패: " + e.getMessage());
         }
     }
@@ -179,6 +180,10 @@ public class ResizeService {
                 }
             }
         }
+    }
+
+    public void resizeComplete(){
+        kafkaTemplate.send("resize-complete", "이미지 리사이징이 완료되었습니다.");
     }
 
 }
