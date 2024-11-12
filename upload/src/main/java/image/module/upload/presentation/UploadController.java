@@ -1,11 +1,6 @@
 package image.module.upload.presentation;
 
 import image.module.upload.application.UploadService;
-import jakarta.servlet.http.HttpSession;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +17,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class UploadController {
 
     private final UploadService uploadService;
-    private final HttpSession httpSession;
 
     @PostMapping
     public SseEmitter uploadImage(@RequestParam("file") MultipartFile file,

@@ -11,7 +11,6 @@ import image.module.convert.dto.OriginalImageResponse;
 import image.module.convert.dto.SendKafkaMessage;
 import image.module.convert.dto.OriginalFileInfo;
 import io.minio.*;
-import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FilenameUtils;
 import org.imgscalr.Scalr;
@@ -27,7 +26,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Slf4j
 @Service
