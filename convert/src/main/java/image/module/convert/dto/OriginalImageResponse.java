@@ -9,5 +9,4 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class OriginalImageResponse {
     private String storedFileName;
     private Integer requestSize;
-    private SseEmitter emitter;
 }
