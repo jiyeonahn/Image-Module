@@ -9,6 +9,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class ReceiveKafkaMessage {
+  private String storedOriginalFileName;
   private String WebPFileName;
   private Integer Size;
 }

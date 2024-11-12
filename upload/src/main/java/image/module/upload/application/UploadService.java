@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -89,7 +90,7 @@ public class UploadService {
                 // 메타데이터 저장
                 ImageResponse imageResponse = dataService.saveImageOriginalData(imageRequest);
 
-                kafkaTemplate.send("image-upload-topic", ImageUploadMessage.createMessage(storedFileName,requestSize));
+                kafkaTemplate.send("image-convert-topic", ImageUploadMessage.createMessage(storedFileName,requestSize));
 
                 return imageResponse.getOriginalFileUUID().toString();
             } catch (Exception e) {
@@ -125,5 +126,10 @@ public class UploadService {
                             .contentType(contentType)
                             .build()
             );
+    }
+
+    @KafkaListener(topics = "image-upload-error-topic", groupId = "image-upload-group")
+    public void rollbackUpload(String storedOriginalFileName) {
+        log.error("UPLOAD ROLLBACK! {}", storedOriginalFileName);
     }
 }
