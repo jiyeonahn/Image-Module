@@ -11,6 +11,7 @@ import image.module.convert.dto.OriginalImageResponse;
 import image.module.convert.dto.SendKafkaMessage;
 import image.module.convert.dto.OriginalFileInfo;
 import io.minio.*;
+import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FilenameUtils;
 import org.imgscalr.Scalr;
@@ -26,6 +27,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Slf4j
 @Service
@@ -87,6 +89,7 @@ public class ConvertService {
       // 9. 임시 파일 삭제
       cleanupTemporaryFiles(originalFile, checkedRotate, webpFile);
 
+      convertComplete();
     } catch (Exception e) {
       log.error("IMAGE CONVERT FAIL!!", e);
       this.rollbackConvert(originalImage.getStoredFileName());
@@ -260,6 +263,10 @@ public class ConvertService {
         }
       }
     }
+  }
+
+  public void convertComplete(){
+    kafkaTemplate.send("convert-complete", "이미지 변환이 완료되었습니다.");
   }
 
   @KafkaListener(topics = "image-convert-error-topic", groupId = "image-upload-group", containerFactory = "stringKafkaListenerContainerFactory")

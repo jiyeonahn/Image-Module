@@ -1,6 +1,7 @@
 package image.module.upload.presentation;
 
 import image.module.upload.application.UploadService;
+import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class UploadController {
 
     private final UploadService uploadService;
+    private final HttpSession httpSession;
 
     @PostMapping
     public SseEmitter uploadImage(@RequestParam("file") MultipartFile file,
