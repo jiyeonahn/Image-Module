@@ -42,49 +42,55 @@ public class ConvertService {
   private final MinioClient minioClient;
   private final DataClient dataClient;
 
-  private final KafkaTemplate<String, SendKafkaMessage> kafkaTemplate;
+  private final KafkaTemplate<String, Object> kafkaTemplate;
 
-  public ConvertService(MinioClient minioClient, DataClient dataClient, KafkaTemplate<String, SendKafkaMessage> kafkaTemplate) {
+  public ConvertService(MinioClient minioClient, DataClient dataClient, KafkaTemplate<String, Object> kafkaTemplate) {
     this.minioClient = minioClient;
     this.dataClient = dataClient;
     this.kafkaTemplate = kafkaTemplate;
   }
 
   // 전체 이미지 처리 로직을 관리하는 메서드
-  @KafkaListener(topics = "image-upload-topic", groupId = "image-upload-group")
+  @KafkaListener(topics = "image-convert-topic", groupId = "image-upload-group")
   public void removeMetadataAndCovertWebP(OriginalImageResponse originalImage) {
-    String storedFileName = originalImage.getStoredFileName();
-    Integer size = originalImage.getRequestSize();
+    try{
+      String storedOriginalFileName = originalImage.getStoredFileName();
+      Integer size = originalImage.getRequestSize();
 
-    // 1. 확장자 추출
-    String extension = extractExtensionFrom(storedFileName);
+      // 1. 확장자 추출
+      String extension = extractExtensionFrom(storedOriginalFileName);
 
-    // 2. 이미지 다운로드
-    File originalFile = downloadImage(storedFileName);
+      // 2. 이미지 다운로드
+      File originalFile = downloadImage(storedOriginalFileName);
 
-    // 3. MINIO 원본 이미지 삭제
-    removeOriginalImage(storedFileName);
+      // 3. MINIO 원본 이미지 삭제
+      removeOriginalImage(storedOriginalFileName);
 
-    // 4. EXIF 메타 데이터 삭제 및 이미지 회전 처리
-    File checkedRotate = removeMetadataAndFixOrientation(originalFile, extension);
+      // 4. EXIF 메타 데이터 삭제 및 이미지 회전 처리
+      File checkedRotate = removeMetadataAndFixOrientation(originalFile, extension);
 
-    // 5. 메타데이터 삭제 이미지 업로드
-    uploadRemoveExifImage(checkedRotate, storedFileName, extension);
+      // 5. 메타데이터 삭제 이미지 업로드
+      uploadRemoveExifImage(checkedRotate, storedOriginalFileName, extension);
 
-    // 6. 원본 이미지 cdnUrl 추가
-    OriginalFileInfo originalFileInfo = OriginalFileInfo.createCdnUrl(storedFileName, cdnBaseUrl);
-    dataClient.createCdnUrl(originalFileInfo);
+      // 6. 원본 이미지 cdnUrl 추가
+      OriginalFileInfo originalFileInfo = OriginalFileInfo.createCdnUrl(storedOriginalFileName, cdnBaseUrl);
+      dataClient.createCdnUrl(originalFileInfo);
 
-    // 7. WebP로 변환
-    File webpFile = convertToWebp(storedFileName, originalFile);
+      // 7. WebP로 변환
+      File webpFile = convertToWebp(storedOriginalFileName, originalFile);
 
-    // 8. WebP 이미지 업로드
-    uploadWebPImage(webpFile);
+      // 8. WebP 이미지 업로드
+      uploadWebPImage(webpFile);
 
-    kafkaTemplate.send("image-resize-topic", SendKafkaMessage.createMessage(webpFile.getName(), size));
+      kafkaTemplate.send("image-resize-topic", SendKafkaMessage.createMessage(storedOriginalFileName, webpFile.getName(), size));
 
-    // 9. 임시 파일 삭제
-    cleanupTemporaryFiles(originalFile, checkedRotate, webpFile);
+      // 9. 임시 파일 삭제
+      cleanupTemporaryFiles(originalFile, checkedRotate, webpFile);
+
+    } catch (Exception e) {
+      log.error("IMAGE CONVERT FAIL!!", e);
+      this.rollbackConvert(originalImage.getStoredFileName());
+    }
   }
 
 
@@ -254,5 +260,11 @@ public class ConvertService {
         }
       }
     }
+  }
+
+  @KafkaListener(topics = "image-convert-error-topic", groupId = "image-upload-group", containerFactory = "stringKafkaListenerContainerFactory")
+  public void rollbackConvert(String storedOriginalFileName) {
+    log.error("CONVERT ROLLBACK!");
+    kafkaTemplate.send("image-upload-error-topic", storedOriginalFileName);
   }
 }
