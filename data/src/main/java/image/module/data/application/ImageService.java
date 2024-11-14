@@ -26,6 +26,11 @@ public class ImageService {
     image.assignOriginalFileUUID();
     return ImageResponse.fromEntity(image);
   }
+  
+  @Transactional
+  public void deleteImageData(String storedFileName){
+    imageRepository.deleteByStoredFileName(storedFileName);
+  }
 
   public ImageResponse getImageName(UUID id) {
     return ImageResponse.fromEntity(imageRepository.findById(id).orElse(null));

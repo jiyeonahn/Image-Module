@@ -9,6 +9,14 @@ import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import io.minio.errors.ErrorResponseException;
+import io.minio.errors.InsufficientDataException;
+import io.minio.errors.InternalException;
+import io.minio.errors.InvalidResponseException;
+import io.minio.errors.ServerException;
+import io.minio.errors.XmlParserException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -41,7 +49,7 @@ public class ResizeService {
     }
 
     @KafkaListener(topics = "image-resize-topic", groupId = "image-upload-group")
-    public void ResizeImage(ReceiveKafkaMessage receiveKafkaMessage) {
+    public void ResizeImage(ReceiveKafkaMessage receiveKafkaMessage) throws Exception {
         try {
             String webPFileName = receiveKafkaMessage.getWebPFileName();
             Integer size = receiveKafkaMessage.getSize();
@@ -70,7 +78,7 @@ public class ResizeService {
             resizeComplete();
         } catch (Exception e) {
             log.error("IMAGE RESIZE FAIL!!", e);
-            kafkaTemplate.send("image-convert-error-topic", receiveKafkaMessage.getStoredOriginalFileName());
+            rollbackResize(receiveKafkaMessage);
         }
 
     }
@@ -183,7 +191,22 @@ public class ResizeService {
     }
 
     public void resizeComplete(){
-        kafkaTemplate.send("resize-complete", "이미지 리사이징이 완료되었습니다.");
+        kafkaTemplate.send("resize-complete", "이미지 리사이징 처리중입니다.");
+    }
+
+    private void rollbackResize(ReceiveKafkaMessage receiveKafkaMessage)
+            throws Exception {
+        String storedFileName = receiveKafkaMessage.getStoredOriginalFileName()+ "_" +receiveKafkaMessage.getSize();
+
+        log.error("RESIZE ROLLBACK! {}", storedFileName);
+
+        dataClient.deleteImageData(storedFileName);
+
+        minioClient.removeObject(RemoveObjectArgs.builder()
+                .bucket(uploadBucket)
+                .object(storedFileName)
+                .build());
+        kafkaTemplate.send("image-convert-rollback", receiveKafkaMessage.getStoredOriginalFileName());
     }
 
 }

@@ -20,6 +20,11 @@ public class ImageController {
     return imageService.saveImageOriginalData(imageRequest);
   }
 
+  @DeleteMapping("/image")
+  public void deleteImageData(@RequestBody String storedFileName){
+    imageService.deleteImageData(storedFileName);
+  }
+
   //fetch -> 객체 조회
   @GetMapping("/image/getImageName")
   public ImageResponse getImageName(@RequestParam("id") UUID id) {

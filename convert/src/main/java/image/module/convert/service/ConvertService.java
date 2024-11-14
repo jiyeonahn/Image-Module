@@ -11,6 +11,15 @@ import image.module.convert.dto.OriginalImageResponse;
 import image.module.convert.dto.SendKafkaMessage;
 import image.module.convert.dto.OriginalFileInfo;
 import io.minio.*;
+import io.minio.errors.ErrorResponseException;
+import io.minio.errors.InsufficientDataException;
+import io.minio.errors.InternalException;
+import io.minio.errors.InvalidResponseException;
+import io.minio.errors.ServerException;
+import io.minio.errors.XmlParserException;
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FilenameUtils;
 import org.imgscalr.Scalr;
@@ -52,7 +61,7 @@ public class ConvertService {
 
   // 전체 이미지 처리 로직을 관리하는 메서드
   @KafkaListener(topics = "image-convert-topic", groupId = "image-upload-group")
-  public void removeMetadataAndCovertWebP(OriginalImageResponse originalImage) {
+  public void removeMetadataAndCovertWebP(OriginalImageResponse originalImage) throws Exception {
     try{
       String storedOriginalFileName = originalImage.getStoredFileName();
       Integer size = originalImage.getRequestSize();
@@ -264,12 +273,21 @@ public class ConvertService {
   }
 
   public void convertComplete(){
-    kafkaTemplate.send("convert-complete", "이미지 변환이 완료되었습니다.");
+    kafkaTemplate.send("convert-complete", "이미지 변환 처리중입니다.");
   }
 
-  @KafkaListener(topics = "image-convert-error-topic", groupId = "image-upload-group", containerFactory = "stringKafkaListenerContainerFactory")
-  public void rollbackConvert(String storedOriginalFileName) {
-    log.error("CONVERT ROLLBACK!");
-    kafkaTemplate.send("image-upload-error-topic", storedOriginalFileName);
+  @KafkaListener(topics = "image-convert-rollback", groupId = "image-upload-group", containerFactory = "stringKafkaListenerContainerFactory")
+  public void rollbackConvert(String storedOriginalFileName)
+          throws Exception {
+    String storedFileName = storedOriginalFileName + ".webp";
+
+    log.error("CONVERT ROLLBACK! {}", storedFileName);
+
+    minioClient.removeObject(RemoveObjectArgs.builder()
+            .bucket(uploadBucket)
+            .object(storedFileName)
+            .build());
+
+    kafkaTemplate.send("image-upload-rollback", storedOriginalFileName);
   }
 }
