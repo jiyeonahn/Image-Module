@@ -5,12 +5,12 @@ import image.module.upload.domain.ImageExtension;
 import image.module.upload.infrastructure.DataService;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
-import java.awt.Image;
+import io.minio.RemoveObjectArgs;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.imageio.ImageIO;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
@@ -19,7 +19,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -42,7 +41,7 @@ public class UploadService {
             uploadOriginalImage(file, cachingTime).handle((result, ex) -> {
                 try {
                     if (ex == null) {
-                        sseEmitter.send(SseEmitter.event().name("1.ORIGINAL").data("이미지 원본 업로드가 완료되었습니다: " + result.getOriginalFileUUID()));
+                        sseEmitter.send(SseEmitter.event().name("1.ORIGINAL").data("이미지 원본 업로드 처리중입니다.: " + result.getOriginalFileUUID()));
                         kafkaTemplate.send("image-convert-topic", ImageUploadMessage.createMessage(
                                 result.getStoredFileName(), size));
                     } else {
@@ -69,6 +68,7 @@ public class UploadService {
     //이미지 데이터 db 저장
     public CompletableFuture<ImageResponse> uploadOriginalImage(MultipartFile file, int cachingTime)
             throws IOException {
+        AtomicReference<String> storedFileName = new AtomicReference<>();
         return CompletableFuture.supplyAsync(() -> {
             try {
                 // 업로드 파일명을 불러옴
@@ -87,14 +87,18 @@ public class UploadService {
                 // createImageRequest
                 ImageRequest imageRequest = createImageRequest(file, cachingTime, originalName, extension);
 
-                String storedFileName = imageRequest.getStoredFileName();
+                storedFileName.set(imageRequest.getStoredFileName());
 
-                uploadImageToMinio(file.getInputStream(), file.getSize(), file.getContentType(), storedFileName);
+                uploadImageToMinio(file.getInputStream(), file.getSize(), file.getContentType(), storedFileName.get());
 
                 return dataService.saveImageOriginalData(imageRequest);
             } catch (Exception e) {
                 log.error("IMAGE UPLOAD FAIL!! ", e);
-                //this.rollbackUpload("");
+                try {
+                    this.rollbackUpload(storedFileName.get());
+                } catch (Exception ex) {
+                    throw new RuntimeException(ex);
+                }
                 throw new RuntimeException(e);
             }
         });
@@ -136,14 +140,29 @@ public class UploadService {
     @KafkaListener(topics = "resize-complete", groupId = "image-upload-group")
     public void onResizeComplete(String message) throws IOException {
         sseEmitter.send(SseEmitter.event().name("3.RESIZE").data(message));
+        sseEmitter.send(SseEmitter.event().name("SUCCESS").data("이미지 업로드가 완료되었습니다."));
         sseEmitter.complete();
     }
 
-//    @KafkaListener(topics = "image-upload-error-topic", groupId = "image-upload-group")
-//    public void rollbackUpload(String storedOriginalFileName) {
-//        log.error("UPLOAD ROLLBACK! {}", storedOriginalFileName);
-//
-//        sseEmitter.send(SseEmitter.event().name("ERROR").data(file.getOriginalFilename() + " 이미지 변환 실패..." + ex.getMessage()));
-//        sseEmitter.completeWithError(ex);
-//    }
+    @KafkaListener(topics = "image-upload-rollback", groupId = "image-upload-group")
+    public void rollbackUpload(String storedFileName) throws Exception {
+        String sanitizedFileName = storedFileName.replace("\"", "");
+        log.error("UPLOAD ROLLBACK! {}", sanitizedFileName);
+
+        //데이터 삭제
+        dataService.deleteImageData(sanitizedFileName);
+        log.info("DELETE IMAGE DATA!!");
+
+        //스토리지에서 파일 삭제
+        minioClient.removeObject(
+                RemoveObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(sanitizedFileName)
+                        .build()
+        );
+        log.info("DELETE MINIO DATA!!");
+
+        sseEmitter.send(SseEmitter.event().name("ERROR").data(" 이미지 업로드를 실패했습니다."));
+        sseEmitter.complete();
+    }
 }

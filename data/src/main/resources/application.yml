@@ -34,4 +34,4 @@ logging:
       hibernate:
         orm:
           jdbc:
-            bind: debug  # trace -> debug로 변경 가능
+            bind: trace  # trace -> debug로 변경 가능

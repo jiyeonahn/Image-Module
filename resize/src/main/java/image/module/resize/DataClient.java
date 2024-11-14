@@ -2,6 +2,7 @@ package image.module.resize;
 
 import image.module.resize.dto.ResizeRequestDto;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -10,4 +11,7 @@ public interface DataClient {
 
   @PostMapping("/image/create/resizeImage")
   void createResizeImage(@RequestBody ResizeRequestDto resizeRequestDto);
+
+  @DeleteMapping("/image")
+  void deleteImageData(@RequestBody String storedFileName);
 }
