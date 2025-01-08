@@ -36,11 +36,11 @@ services:
       - ./cdn/images:/app/cdn/images  # 로컬 cdn 폴더의 images 폴더를 컨테이너에 매핑
     env_file:
       - .env
-  url:
+  fetch:
     build:
       dockerfile: Dockerfile
       args:
-        - FILE_DIRECTORY=./url
+        - FILE_DIRECTORY=./fetch
     ports:
       - "19093:19093"
     networks:

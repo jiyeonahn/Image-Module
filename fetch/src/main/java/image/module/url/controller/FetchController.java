@@ -1,7 +1,7 @@
 package image.module.url.controller;
 
 
-import image.module.url.service.UrlService;
+import image.module.url.service.FetchService;
 import java.util.UUID;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.ResponseEntity;
@@ -13,13 +13,13 @@ import org.springframework.web.bind.annotation.RestController;
 @Log4j2
 @RestController
 @RequestMapping("/fetch")
-public class UrlController {
+public class FetchController {
 
 
-    private final UrlService urlService;
+    private final FetchService urlService;
 
 
-    public UrlController( UrlService urlService) {
+    public FetchController(FetchService urlService) {
         this.urlService = urlService;
     }
 

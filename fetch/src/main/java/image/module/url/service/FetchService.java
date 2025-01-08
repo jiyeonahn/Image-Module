@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
 @Log4j2
 @Service
 @RequiredArgsConstructor
-public class UrlService {
+public class FetchService {
 
     private final DataService dataService;
     private final MinioClient minioClient;
