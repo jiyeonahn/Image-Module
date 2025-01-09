@@ -14,7 +14,6 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
     Image findByCdnUrl(String cdnUrl);
   Optional<Image> findByStoredFileName(String storedFileName);
 
-    @Query("SELECT i FROM image i WHERE i.originalFileUUID = :originalFileUuid AND i.size = :size")
-    Optional<Image> findByOriginalFileUuidAndSize(@Param("originalFileUuid") UUID originalFileUuid,
+    Optional<Image> findByOriginalFileUUIDAndSize(@Param("originalFileUUID") UUID originalFileUUID,
                                                   @Param("size") Integer size);
 }

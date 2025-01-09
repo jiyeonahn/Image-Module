@@ -11,6 +11,7 @@ import java.util.UUID;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping
+@Slf4j
 public class ImageController {
 
   private final ImageService imageService;
@@ -28,19 +29,14 @@ public class ImageController {
   //fetch -> 객체 조회
   @GetMapping("/image/getImageName")
   public ImageResponse getImageName(@RequestParam("id") UUID id) {
-
-    ImageResponse getImageName = imageService.getImageName(id);
-
-    return getImageName;
+      return imageService.getImageName(id);
   }
 
   //fetch -> cdn 주소로 객체 조회
   @GetMapping("/image/getCDNImageName")
   public ImageResponse getCDNImageName(@RequestParam("cdnUrl") String cdnUrl) {
 
-    ImageResponse getCDNImageName = imageService.getCDNImageName(cdnUrl);
-
-    return getCDNImageName;
+      return imageService.getCDNImageName(cdnUrl);
   }
 
   // 원본 이미지 cdnUrl 추가

@@ -1,6 +1,10 @@
 spring:
   application:
     name: data
+  data:
+    redis:
+      host: redis
+      port: 6379
   datasource:
     url: jdbc:postgresql://server_data_db:5432/server_data
     username: server_data_db
