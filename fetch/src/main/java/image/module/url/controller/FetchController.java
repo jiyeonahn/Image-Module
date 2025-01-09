@@ -16,11 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class FetchController {
 
 
-    private final FetchService urlService;
+    private final FetchService fetchService;
 
 
-    public FetchController(FetchService urlService) {
-        this.urlService = urlService;
+    public FetchController(FetchService fetchService) {
+        this.fetchService = fetchService;
     }
 
 
@@ -28,17 +28,12 @@ public class FetchController {
     @GetMapping("/cdnUrl")
     public ResponseEntity<String> getImage(@RequestParam("id") UUID id,
                                            @RequestParam(value = "size", required = false ) Integer size){
-
-
-
         //원본 : size null 일 때
         if(size==null){
-            return urlService.getCdnUrl(id);
+            return fetchService.getCdnUrl(id);
         }
-
         //리사이징 된 이미지 조회
-
-        return urlService.getReCdnUrl(id, size);
+        return fetchService.getReCdnUrl(id, size);
     }
 
 
@@ -47,7 +42,7 @@ public class FetchController {
     @GetMapping("/image/byte")
     public ResponseEntity<byte[]> fetchImageByte(@RequestParam("cdnUrl") String cdnUrl) {
 
-        return urlService.fetchImageByte(cdnUrl);
+        return fetchService.fetchImageByte(cdnUrl);
     }
 }
 

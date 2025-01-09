@@ -6,8 +6,10 @@ import image.module.data.presentation.ImageRequest;
 import image.module.data.presentation.OriginalFileInfo;
 import image.module.data.presentation.ResizeRequestDto;
 import jakarta.persistence.EntityNotFoundException;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,10 +34,13 @@ public class ImageService {
     imageRepository.deleteByStoredFileName(storedFileName);
   }
 
+  //TODO: ehcache 실습
+  @Cacheable(cacheNames = "fetchImage", key="#id")
   public ImageResponse getImageName(UUID id) {
-    return ImageResponse.fromEntity(imageRepository.findById(id).orElse(null));
+    return ImageResponse.fromEntity(Objects.requireNonNull(imageRepository.findById(id).orElse(null)));
   }
 
+  @Cacheable(cacheNames = "fetchCdnImage", key="#cdnUrl")
   public ImageResponse getCDNImageName(String cdnUrl) {
 
     Image image = imageRepository.findByCdnUrl(cdnUrl);
@@ -78,8 +83,9 @@ public class ImageService {
   }
 
   // 이미지 resizing cdn url 반환
+  @Cacheable(cacheNames = "fetchImageAndSize", key="#originalFileUUID + '_' + #size")
   public ImageResponse getReCdnUrl(UUID originalFileUUID, Integer size) {
-    Image image = imageRepository.findByOriginalFileUuidAndSize(originalFileUUID, size)
+    Image image = imageRepository.findByOriginalFileUUIDAndSize(originalFileUUID, size)
             .orElseThrow(() -> new RuntimeException("이미지를 찾을 수 없습니다."));
 
     return ImageResponse.fromEntity(image);
